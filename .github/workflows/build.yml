@@ -1,0 +1,89 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            runner: windows-latest
+            platform: windows
+          - name: macOS-Intel
+            runner: macos-15-intel
+            platform: macos
+          - name: macOS-AppleSilicon
+            runner: macos-15
+            platform: macos
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build tool
+        run: python -m pip install --upgrade pyinstaller
+
+      - name: Check Python syntax
+        run: python -m py_compile CraftAppsInstaller.py
+
+      - name: Build Windows EXE
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name CraftAppsInstaller CraftAppsInstaller.py
+          New-Item -ItemType Directory -Path release -Force | Out-Null
+          Copy-Item dist/CraftAppsInstaller.exe release/CraftAppsInstaller-Windows.exe
+
+      - name: Build macOS app and ZIP
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          python -m PyInstaller --noconfirm --clean --onedir --windowed --name CraftAppsInstaller CraftAppsInstaller.py
+          mkdir -p release
+          ditto -c -k --sequesterRsrc --keepParent \
+            dist/CraftAppsInstaller.app \
+            "release/CraftAppsInstaller-${{ matrix.name }}.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CraftAppsInstaller-${{ matrix.name }}
+          path: release/*
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download built files
+        uses: actions/download-artifact@v4
+        with:
+          pattern: CraftAppsInstaller-*
+          merge-multiple: true
+          path: release
+
+      - name: Publish tagged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release create "$GITHUB_REF_NAME" release/* --verify-tag --generate-notes
