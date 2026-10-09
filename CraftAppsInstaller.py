@@ -17,6 +17,7 @@ import zipfile
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+from update_support import detect_installed, has_update, remember_install
 
 OWNER = 'storytold'
 APPS = ['photocraft', 'lightcraft', 'filmcraft', 'effectcraft', 'designcraft',
@@ -457,6 +458,19 @@ def install_linux(app, path, log, desktop=False, shortcut_label=None):
         try: linux_desktop_shortcut(app, log, launcher, shortcut_label)
         except Exception as exc: log(f'Installed, but desktop shortcut not created: {exc}')
 
+
+def installed_location(app, system, standalone):
+    """Location known to this installer after a successful install."""
+    if system == 'Windows' and standalone:
+        root = Path(os.environ.get('LOCALAPPDATA', str(Path.home() / 'AppData/Local')))
+        return root / 'Programs' / 'CraftApps' / display_name(app)
+    if system == 'macOS':
+        return Path.home() / 'Applications' / (display_name(app) + '.app')
+    if system == 'Linux':
+        if standalone:
+            return (Path.home() / '.local/bin' / (app + '.AppImage'))
+    return None
+
 class InstallerUI:
     def __init__(self, root):
         self.root = root
@@ -548,6 +562,8 @@ class InstallerUI:
         self.refresh.pack(side='left')
         ttk.Button(controls, text='Select all', command=lambda: self.select_all(True)).pack(side='left', padx=7)
         ttk.Button(controls, text='Clear', command=lambda: self.select_all(False)).pack(side='left')
+        self.check_updates_button = ttk.Button(controls, text='Check for Updates', command=self.check_updates)
+        self.check_updates_button.pack(side='left', padx=(15, 0))
         self.go = ttk.Button(controls, text='Download and install selected', command=self.start)
         self.go.pack(side='right')
         self.system.trace_add('write', lambda *_: self.update_button())
@@ -648,11 +664,13 @@ class InstallerUI:
                     self.releases[app] = rels
                     choices = ['Latest stable'] + [r['tag_name'] for r in rels]
                     self.rows[app][2].config(values=choices)
+                elif kind == 'updates': self.show_updates(args[0], args[1])
                 elif kind == 'error': messagebox.showerror('Installer', args[0])
                 elif kind == 'done':
                     self.busy = False
                     self.refresh.config(state='normal')
                     self.go.config(state='normal')
+                    self.check_updates_button.config(state='normal')
         except queue.Empty: pass
         self.root.after(100, self.drain)
 
@@ -661,6 +679,7 @@ class InstallerUI:
         self.busy = True
         self.refresh.config(state='disabled')
         self.go.config(state='disabled')
+        self.check_updates_button.config(state='disabled')
         def wrapper():
             try: fn()
             except Exception as exc: self.emit('error', str(exc))
@@ -675,6 +694,105 @@ class InstallerUI:
                     self.emit('versions', app, rels)
                     self.log(f'{app}: found {len(rels)} releases')
                 except Exception as e: self.log(f'{app}: cannot fetch versions: {e}')
+        self.work(task)
+
+    def check_updates(self):
+        if self.selected_system() != detect_os():
+            messagebox.showinfo('Check for Updates', 'Select the current operating system to check installed apps.')
+            return
+        system = detect_os()
+        def task():
+            available, unknown = [], []
+            for app in APPS:
+                try:
+                    detected = detect_installed(app, system)
+                    if not detected:
+                        continue
+                    installed = detected.get('version')
+                    releases = self.releases.get(app) or get_releases(app)
+                    newest = latest_release(releases)
+                    if not newest:
+                        self.log(f'[{app}] No stable release found')
+                        continue
+                    tag = newest['tag_name']
+                    comparison = has_update(installed, tag)
+                    self.log(f'[{app}] Installed: {installed or "unknown"}; latest: {tag}; ' +
+                             ('Update available' if comparison is True else
+                              'Up to date' if comparison is False else 'Version cannot be compared'))
+                    if comparison is True:
+                        available.append((app, installed, newest, detected))
+                    elif comparison is None:
+                        unknown.append((app, installed, tag))
+                except Exception as exc:
+                    self.log(f'[{app}] Update check failed: {exc}')
+            self.emit('updates', available, unknown)
+        self.work(task)
+
+    def show_updates(self, available, unknown):
+        if not available:
+            note = 'No confirmed updates found.'
+            if unknown:
+                note += f'\\n\\n{len(unknown)} installed app(s) have unknown versions; see Activity log.'
+            messagebox.showinfo('Check for Updates', note)
+            return
+        window = tk.Toplevel(self.root)
+        window.title('Available Craft App Updates')
+        window.geometry('680x420')
+        window.transient(self.root)
+        window.grab_set()
+        ttk.Label(window, text='Choose the updates to install', font=('TkDefaultFont', 13, 'bold')).pack(anchor='w', padx=15, pady=(15, 5))
+        ttk.Label(window, text='Only confirmed newer stable versions are listed. Close the apps before updating.').pack(anchor='w', padx=15)
+        body = ttk.Frame(window, padding=15)
+        body.pack(fill='both', expand=True)
+        checks = {}
+        for app, installed, release, details in available:
+            choice = tk.BooleanVar(value=True)
+            checks[app] = choice
+            ttk.Checkbutton(body, text=f'{display_name(app)}: {installed} → {release["tag_name"]}',
+                            variable=choice).pack(anchor='w', pady=5)
+        if unknown:
+            ttk.Label(body, text=f'{len(unknown)} other installed app(s) have unknown version information (see log).').pack(anchor='w', pady=(15, 0))
+        actions = ttk.Frame(window, padding=15)
+        actions.pack(fill='x')
+        def apply():
+            selected = [item for item in available if checks[item[0]].get()]
+            if not selected:
+                return
+            if not messagebox.askyesno('Confirm updates', f'Install {len(selected)} selected update(s)?', parent=window):
+                return
+            window.destroy()
+            self.install_updates(selected)
+        ttk.Button(actions, text='Install selected updates', command=apply).pack(side='right')
+        ttk.Button(actions, text='Cancel', command=window.destroy).pack(side='right', padx=8)
+
+    def install_updates(self, selected):
+        system, arch = detect_os(), detect_arch()
+        def task():
+            succeeded, failed = 0, 0
+            for app, previous, release, details in selected:
+                try:
+                    fmt = details.get('linux_format') or local_linux_format()
+                    standalone = bool(details.get('standalone'))
+                    asset = choose_asset(release, system, arch, fmt, standalone)
+                    if asset is None:
+                        raise RuntimeError('No compatible update package for the installed format')
+                    self.log(f'[{app}] Updating {previous} → {release["tag_name"]}')
+                    with tempfile.TemporaryDirectory(prefix=f'craftapps-update-{app}-') as temp:
+                        path = download(asset, Path(temp), self.log)
+                        {'Windows': install_windows, 'macOS': install_macos, 'Linux': install_linux}[system](
+                            app, path, self.log, desktop=bool(details.get('desktop')),
+                            shortcut_label=details.get('shortcut_label') or display_name(app))
+                    remember_install(app, release['tag_name'], system, arch, asset['name'],
+                                     location=installed_location(app, system, standalone),
+                                     linux_format=fmt, standalone=standalone,
+                                     desktop=bool(details.get('desktop')),
+                                     shortcut_label=details.get('shortcut_label'))
+                    succeeded += 1
+                    self.log(f'[{app}] Update installed successfully')
+                except Exception as exc:
+                    failed += 1
+                    self.log(f'[{app}] UPDATE FAILED: {exc}')
+            self.log(f'Updates complete: {succeeded} succeeded; {failed} failed')
         self.work(task)
 
     def start(self):
@@ -730,6 +848,14 @@ class InstallerUI:
                                 app, path, self.log, desktop=create_icons,
                                 shortcut_label=shortcut_name(app, include_similar))
                         self.log(f'[{app}] Temporary installation package deleted')
+                        try:
+                            remember_install(app, release['tag_name'], system, arch, asset['name'],
+                                             location=installed_location(app, system, standalone),
+                                             linux_format=fmt, standalone=standalone,
+                                             desktop=create_icons,
+                                             shortcut_label=shortcut_name(app, include_similar))
+                        except Exception as exc:
+                            self.log(f'[{app}] Could not save update tracking record: {exc}')
                     good += 1
                     self.log(f'[{app}] SUCCESS')
                 except Exception as exc:
