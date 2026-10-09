@@ -21,6 +21,7 @@ On macOS, unzip the archive and launch `CraftAppsInstaller.app`. These initial b
 ## Features
 
 - Choose one or more Craft apps and optionally select a specific release (latest stable by default).
+- **Check for Updates** discovers installed Craft apps, compares identifiable versions with the latest stable releases, and lets you choose which confirmed updates to install. Successful installs are tracked locally; existing MSI, macOS app bundles, and Linux package installs can be discovered too. Unknown versions are reported rather than force-updated.
 - Automatically detect the operating system and CPU architecture, with manual overrides for download-only use.
 - Select normal installers or standalone/portable packages where release assets support them.
 - Download only to a selected folder, or install automatically and remove temporary installer packages.
