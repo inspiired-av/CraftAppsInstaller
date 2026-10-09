@@ -711,6 +711,8 @@ class InstallerUI:
                     installed = detected.get('version')
                     releases = self.releases.get(app) or get_releases(app)
                     newest = latest_release(releases)
+                    if newest and newest.get('prerelease'):
+                        newest = None
                     if not newest:
                         self.log(f'[{app}] No stable release found')
                         continue
