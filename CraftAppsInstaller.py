@@ -20,7 +20,7 @@ from tkinter import ttk, filedialog, messagebox
 
 OWNER = 'storytold'
 APPS = ['photocraft', 'lightcraft', 'filmcraft', 'effectcraft', 'designcraft',
-        'pdfcraft', 'vectorcraft', 'wordcraft', 'gridcraft']
+        'pdfcraft', 'vectorcraft', 'wordcraft', 'gridcraft', 'deckcraft'
 APP_LABELS = {
     'photocraft': 'PhotoCraft (Photoshop)',
     'lightcraft': 'LightCraft (Lightroom)',
@@ -31,6 +31,7 @@ APP_LABELS = {
     'vectorcraft': 'VectorCraft (Illustrator)',
     'wordcraft': 'WordCraft (Microsoft Word)',
     'gridcraft': 'GridCraft (Microsoft Excel)',
+    'deckcraft': 'DeckCraft (Microsoft PowerPoint)',
 }
 
 def display_name(app):
@@ -460,7 +461,7 @@ class InstallerUI:
     def __init__(self, root):
         self.root = root
         root.title('Craft Apps Installer')
-        root.geometry('930x820')
+        root.geometry('930x860')
         self.messages = queue.Queue()
         self.releases = {}
         self.rows = {}
