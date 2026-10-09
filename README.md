@@ -2,6 +2,8 @@
 
 A cross-platform graphical downloader and installer for the [storytold](https://github.com/storytold) Craft applications: PhotoCraft, LightCraft, FilmCraft, EffectCraft, DesignCraft, PDFCraft, VectorCraft, WordCraft, GridCraft, and DeckCraft.
 
+<img src="assets/app-icon.png" width="200" alt="Craft Apps Logo image">
+
 This project is an independent downloader and is **not affiliated with, endorsed by, or maintained by storytold or the companies behind the comparable commercial applications**.
 
 ![Craft Apps Installer screenshot](assets/screenshot.png)
