@@ -4,6 +4,8 @@ A cross-platform graphical downloader and installer for the [storytold](https://
 
 This project is an independent downloader and is **not affiliated with, endorsed by, or maintained by storytold or the companies behind the comparable commercial applications**.
 
+![Craft Apps Installer screenshot](assets/screenshot.png)
+
 ## Download
 
 Download the latest standalone builds from [Releases](../../releases) when available. Recipients do not need to install Python.
