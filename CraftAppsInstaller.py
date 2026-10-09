@@ -20,7 +20,7 @@ from tkinter import ttk, filedialog, messagebox
 
 OWNER = 'storytold'
 APPS = ['photocraft', 'lightcraft', 'filmcraft', 'effectcraft', 'designcraft',
-        'pdfcraft', 'vectorcraft', 'wordcraft', 'gridcraft', 'deckcraft'
+        'pdfcraft', 'vectorcraft', 'wordcraft', 'gridcraft', 'deckcraft']
 APP_LABELS = {
     'photocraft': 'PhotoCraft (Photoshop)',
     'lightcraft': 'LightCraft (Lightroom)',
