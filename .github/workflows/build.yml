@@ -40,7 +40,10 @@ jobs:
         run: python -m pip install --upgrade pyinstaller
 
       - name: Check Python syntax
-        run: python -m py_compile CraftAppsInstaller.py
+        run: python -m py_compile CraftAppsInstaller.py update_support.py
+
+      - name: Test update support
+        run: python -m unittest discover -s tests -v
 
       - name: Prepare macOS app icon
         if: matrix.platform == 'macos'
