@@ -57,4 +57,4 @@ Builds are not code-signed or notarized. Automatic installations can request ope
 
 ## License
 
-See [LICENSE](LICENSE) for the GNU General Public License v3.
+The original installer source code is available under the [MIT License](LICENSE). For details about the supplied app artwork and upstream Crafting Apps' icon licensing, see [ATTRIBUTION.md](ATTRIBUTION.md). The repository's MIT license does not relicense third-party artwork, trademarks, or applications downloaded by this installer.
