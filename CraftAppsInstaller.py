@@ -459,7 +459,7 @@ def install_linux(app, path, log, desktop=False, shortcut_label=None):
         except Exception as exc: log(f'Installed, but desktop shortcut not created: {exc}')
 
 
-def installed_location(app, system, standalone):
+def installed_location(app, system, standalone, linux_format=None):
     """Location known to this installer after a successful install."""
     if system == 'Windows' and standalone:
         root = Path(os.environ.get('LOCALAPPDATA', str(Path.home() / 'AppData/Local')))
@@ -467,8 +467,10 @@ def installed_location(app, system, standalone):
     if system == 'macOS':
         return Path.home() / 'Applications' / (display_name(app) + '.app')
     if system == 'Linux':
-        if standalone:
-            return (Path.home() / '.local/bin' / (app + '.AppImage'))
+        if linux_format == 'Tarball':
+            return Path.home() / '.local/opt/CraftApps' / display_name(app)
+        if linux_format == 'AppImage':
+            return Path.home() / '.local/bin' / (app + '.AppImage')
     return None
 
 class InstallerUI:
@@ -785,7 +787,7 @@ class InstallerUI:
                             app, path, self.log, desktop=bool(details.get('desktop')),
                             shortcut_label=details.get('shortcut_label') or display_name(app))
                     remember_install(app, release['tag_name'], system, arch, asset['name'],
-                                     location=installed_location(app, system, standalone),
+                                     location=installed_location(app, system, standalone, fmt),
                                      linux_format=fmt, standalone=standalone,
                                      desktop=bool(details.get('desktop')),
                                      shortcut_label=details.get('shortcut_label'))
@@ -852,7 +854,7 @@ class InstallerUI:
                         self.log(f'[{app}] Temporary installation package deleted')
                         try:
                             remember_install(app, release['tag_name'], system, arch, asset['name'],
-                                             location=installed_location(app, system, standalone),
+                                             location=installed_location(app, system, standalone, fmt),
                                              linux_format=fmt, standalone=standalone,
                                              desktop=create_icons,
                                              shortcut_label=shortcut_name(app, include_similar))
