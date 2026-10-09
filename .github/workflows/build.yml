@@ -42,11 +42,27 @@ jobs:
       - name: Check Python syntax
         run: python -m py_compile CraftAppsInstaller.py
 
+      - name: Prepare macOS app icon
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          if [ -f assets/app-icon.png ]; then
+            mkdir -p build/icon.iconset
+            for s in 16 32 128 256 512; do
+              sips -z "$s" "$s" assets/app-icon.png --out "build/icon.iconset/icon_${s}x${s}.png" >/dev/null
+              double=$((s*2))
+              sips -z "$double" "$double" assets/app-icon.png --out "build/icon.iconset/icon_${s}x${s}@2x.png" >/dev/null
+            done
+            iconutil -c icns build/icon.iconset -o assets/app-icon.icns
+          fi
+
       - name: Build Windows EXE
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name CraftAppsInstaller CraftAppsInstaller.py
+          $iconArg = @()
+          if (Test-Path assets/app-icon.ico) { $iconArg = @('--icon', 'assets/app-icon.ico') }
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name CraftAppsInstaller @iconArg CraftAppsInstaller.py
           New-Item -ItemType Directory -Path release -Force | Out-Null
           Copy-Item dist/CraftAppsInstaller.exe release/CraftAppsInstaller-Windows.exe
 
@@ -54,7 +70,9 @@ jobs:
         if: matrix.platform == 'macos'
         shell: bash
         run: |
-          python -m PyInstaller --noconfirm --clean --onedir --windowed --name CraftAppsInstaller CraftAppsInstaller.py
+          icon_args=()
+          if [ -f assets/app-icon.icns ]; then icon_args=(--icon assets/app-icon.icns); fi
+          python -m PyInstaller --noconfirm --clean --onedir --windowed --name CraftAppsInstaller "${icon_args[@]}" CraftAppsInstaller.py
           mkdir -p release
           ditto -c -k --sequesterRsrc --keepParent \
             dist/CraftAppsInstaller.app \
