@@ -10,6 +10,8 @@ This project is an independent downloader and is **not affiliated with, endorsed
 
 ## Download
 
+**Code signing status:** Windows releases are currently unsigned. This project is applying to the [SignPath Foundation](https://signpath.org/) for free Windows code signing. If accepted, future Windows releases will use SignPath.io with a certificate provided by SignPath Foundation. See the [Code signing policy](#code-signing-policy) below.
+
 Download the latest standalone builds from [Releases](../../releases) when available. Recipients do not need to install Python.
 
 | Platform | Release download |
@@ -57,6 +59,21 @@ git push origin v1.0.0
 Find CI build logs and artifacts in the repository's **Actions** tab. Publishing requires GitHub Actions to be enabled, and release creation requires the workflow token's `contents: write` permission (granted to its release job).
 
 Builds are not code-signed or notarized. Automatic installations can request operating-system administrator privileges. Windows and macOS behavior should be tested on each target platform before wide distribution.
+
+## Code signing policy
+
+**Status:** Application to SignPath Foundation pending. Existing releases are unsigned; displaying this policy does not mean any binary has already been signed or endorsed.
+
+**SignPath acknowledgment:** Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/) (planned, subject to acceptance).
+
+**Code signing and release process:** The installer is built from this public GitHub repository with GitHub-hosted GitHub Actions. If accepted into the program, future Windows releases intended for publication will be submitted for verified signing, with a separate manual approval for each release. Only project-owned build artifacts will be submitted; downloaded Craft applications will not be signed using this project's certificate.
+
+**Project team roles:**
+- **Committers and reviewers:** [@inspiired-av](https://github.com/inspiired-av) (repository maintainer). Contributions submitted by others are to be reviewed before merging.
+- **Code signing approver:** [@inspiired-av](https://github.com/inspiired-av). Each release signing request requires explicit manual approval.
+- Maintainers with release/signing access are required to enable multi-factor authentication on GitHub and SignPath.
+
+**Privacy policy:** Craft Apps Installer does not collect analytics or telemetry. It contacts GitHub to retrieve release information and to download packages only when requested by the person operating the installer (for example, using **Load available versions**, **Check for Updates**, or an installation/download command). Normal network-level information, such as the requesting IP address, may be visible to GitHub. Installation tracking records are stored locally on the user's device, not sent to the maintainers. The installer does not transmit any other information to networked systems without a user-initiated action. Consult [GitHub's privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement) for GitHub API and download interactions.
 
 ## License
 
