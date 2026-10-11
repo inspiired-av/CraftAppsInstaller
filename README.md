@@ -26,6 +26,7 @@ On macOS, unzip the archive and launch `CraftAppsInstaller.app`. These initial b
 
 - Choose one or more Craft apps and optionally select a specific release (latest stable by default).
 - **Check for Updates** discovers installed Craft apps, compares identifiable versions with the latest stable releases, and lets you choose which confirmed updates to install. Successful installs are tracked locally; existing MSI, macOS app bundles, and Linux package installs can be discovered too. Unknown versions are reported rather than force-updated.
+- Windows shortcuts, installed-program discovery, and EXE version checks use native Windows APIs rather than PowerShell scripts.
 - Automatically detect the operating system and CPU architecture, with manual overrides for download-only use.
 - Select normal installers or standalone/portable packages where release assets support them.
 - Download only to a selected folder, or install automatically and remove temporary installer packages.
@@ -55,6 +56,8 @@ Example release commands:
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+On pushes to `main` and manual workflow runs, the Windows job also uploads **`Onedir-Diagnostic-Windows`**, a ZIP containing an experimental `--onedir` build. It is available only as a GitHub Actions artifact, not included in published releases. Extract the ZIP and keep its `_internal` folder next to the executable when testing; scanning only the EXE does not evaluate all dependencies. Compare results in an isolated environment before drawing conclusions about malware detections.
 
 Find CI build logs and artifacts in the repository's **Actions** tab. Publishing requires GitHub Actions to be enabled, and release creation requires the workflow token's `contents: write` permission (granted to its release job).
 
