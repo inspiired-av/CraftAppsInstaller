@@ -178,7 +178,7 @@ def _registered_executables(app, display):
     import winreg
     exe_name = app + ".exe"
     uninstall = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
-    app_paths = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\" + exe_name
+    app_paths = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\" + exe_name
     for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
         for view in (winreg.KEY_WOW64_64KEY, winreg.KEY_WOW64_32KEY):
             try:
