@@ -15,6 +15,7 @@ class WindowsNativeTests(unittest.TestCase):
         self.assertEqual(guid.Data1, 0x00021401)
         self.assertEqual(guid.Data4[0], 0xC0)
 
+    @unittest.skipUnless(sys.platform == "win32", "Windows-only shortcut input test")
     def test_rejects_invalid_windows_shortcut_names(self):
         with patch.object(win, "_require_windows"):
             path = Path(sys.executable)
