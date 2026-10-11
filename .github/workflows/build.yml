@@ -40,7 +40,7 @@ jobs:
         run: python -m pip install --upgrade pyinstaller
 
       - name: Check Python syntax
-        run: python -m py_compile CraftAppsInstaller.py update_support.py
+        run: python -m py_compile CraftAppsInstaller.py update_support.py windows_native.py
 
       - name: Test update support
         run: python -m unittest discover -s tests -v
@@ -68,6 +68,24 @@ jobs:
           python -m PyInstaller --noconfirm --clean --onefile --windowed --name CraftAppsInstaller @iconArg CraftAppsInstaller.py
           New-Item -ItemType Directory -Path release -Force | Out-Null
           Copy-Item dist/CraftAppsInstaller.exe release/CraftAppsInstaller-Windows.exe
+
+      - name: Build Windows onedir diagnostic
+        if: matrix.platform == 'windows' && !startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $iconArg = @()
+          if (Test-Path assets/app-icon.ico) { $iconArg = @('--icon', 'assets/app-icon.ico') }
+          python -m PyInstaller --noconfirm --clean --onedir --windowed --name CraftAppsInstaller @iconArg CraftAppsInstaller.py
+          New-Item -ItemType Directory -Path diagnostic -Force | Out-Null
+          Compress-Archive -Path dist/CraftAppsInstaller -DestinationPath diagnostic/CraftAppsInstaller-Windows-onedir-test.zip -Force
+
+      - name: Upload Windows onedir diagnostic
+        if: matrix.platform == 'windows' && !startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v7
+        with:
+          name: Onedir-Diagnostic-Windows
+          path: diagnostic/CraftAppsInstaller-Windows-onedir-test.zip
+          if-no-files-found: error
 
       - name: Build macOS app and ZIP
         if: matrix.platform == 'macos'
