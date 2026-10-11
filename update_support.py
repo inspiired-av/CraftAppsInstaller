@@ -137,13 +137,9 @@ def _windows_registry(app):
 
 
 def _windows_exe_version(executable):
-    if not executable.is_file():
-        return None
-    # No shell; do not launch the GUI program just to read version metadata.
-    quote = str(executable).replace("'", "''")
-    script = "(Get-Item -LiteralPath '" + quote + "').VersionInfo.ProductVersion"
-    return _command(["powershell.exe", "-NoProfile", "-NonInteractive",
-                     "-Command", script], timeout=8)
+    """Read executable version metadata through the Windows version API."""
+    from windows_native import executable_version
+    return executable_version(executable)
 
 
 def _windows_portable(app):
