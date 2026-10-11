@@ -160,124 +160,17 @@ def safe_untar(src, dst):
                 raise RuntimeError('Tar archive contains links or special files')
         tf.extractall(dst)
 
-def run_windows_powershell(script):
-    """Run PowerShell without shell quoting ambiguities; return stdout."""
-    import base64
-    command = base64.b64encode(script.encode('utf-16le')).decode('ascii')
-    result = subprocess.run(
-        ['powershell.exe', '-NoProfile', '-NonInteractive', '-EncodedCommand', command],
-        check=True, capture_output=True, text=True)
-    return result.stdout.strip()
-
-
 def windows_find_installed_executable(app):
-    """Resolve a *real* installed app EXE after MSI/EXE setup, not the setup file.
-
-    The installed location can differ between machine-wide and per-user setups.
-    Prefer registry installation records, then actual Start Menu link targets, then
-    standard app installation folders. Do not guess if none contains the EXE.
-    """
-    import base64
-    display = display_name(app)
-    quote = lambda val: "'" + str(val).replace("'", "''") + "'"
-    script = f"""
-$ErrorActionPreference = 'Stop'
-$appName = {quote(display)}
-$exeName = {quote(app + '.exe')}
-$candidates = [System.Collections.Generic.List[string]]::new()
-
-# Uninstall records often contain the MSI-selected installation directory.
-$uninstall = @(
-    'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
-    'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
-    'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*'
-)
-foreach ($registryPath in $uninstall) {{
-    foreach ($entry in @(Get-ItemProperty -Path $registryPath -ErrorAction SilentlyContinue)) {{
-        if ($null -eq $entry -or $entry.DisplayName -ine $appName) {{ continue }}
-        if ($entry.InstallLocation) {{
-            $candidates.Add((Join-Path $entry.InstallLocation $exeName))
-        }}
-    }}
-}}
-
-# App Paths is another authoritative Windows registration for an EXE.
-foreach ($hive in @('HKLM:', 'HKCU:')) {{
-    $key = Join-Path $hive ('SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\' + $exeName)
-    $entry = Get-Item -LiteralPath $key -ErrorAction SilentlyContinue
-    if ($entry) {{
-        $value = $entry.GetValue('')
-        if ($value) {{ $candidates.Add([string]$value) }}
-    }}
-}}
-
-# Installer-created Start Menu shortcuts can reveal custom install locations.
-$shell = New-Object -ComObject WScript.Shell
-foreach ($folder in @([Environment]::GetFolderPath('Programs'),
-                      [Environment]::GetFolderPath('CommonPrograms'))) {{
-    if (-not $folder -or -not (Test-Path -LiteralPath $folder)) {{ continue }}
-    foreach ($link in @(Get-ChildItem -LiteralPath $folder -Filter '*.lnk' -Recurse -ErrorAction SilentlyContinue)) {{
-        if ($link.BaseName -ine $appName -and $link.BaseName -ine $exeName.Replace('.exe','')) {{ continue }}
-        try {{
-            $target = $shell.CreateShortcut($link.FullName).TargetPath
-            if ($target) {{ $candidates.Add($target) }}
-        }} catch {{}}
-    }}
-}}
-
-# Normal installation defaults: e.g. C:\\Program Files\\GridCraft\\gridcraft.exe.
-$roots = @($env:ProgramFiles, ${{env:ProgramFiles(x86)}},
-           (Join-Path $env:LOCALAPPDATA 'Programs'), $env:LOCALAPPDATA)
-foreach ($root in $roots) {{
-    if (-not $root) {{ continue }}
-    $folder = Join-Path $root $appName
-    $candidates.Add((Join-Path $folder $exeName))
-    $candidates.Add((Join-Path (Join-Path $root ($appName + ' App')) $exeName))
-}}
-
-foreach ($candidate in $candidates) {{
-    if (-not $candidate) {{ continue }}
-    if ([System.IO.Path]::GetFileName($candidate) -ine $exeName) {{ continue }}
-    if (Test-Path -LiteralPath $candidate -PathType Leaf) {{
-        # Encode the path for reliable round-tripping with non-ASCII user folders.
-        $resolved = (Get-Item -LiteralPath $candidate).FullName
-        [Console]::Out.WriteLine([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($resolved)))
-        exit 0
-    }}
-}}
-throw "Cannot locate installed $exeName. Desktop shortcut will not be created."
-"""
-    found = run_windows_powershell(script).splitlines()
-    if not found or not found[-1]:
-        raise RuntimeError(f'Could not resolve installed executable for {display}')
-    try:
-        return Path(base64.b64decode(found[-1], validate=True).decode('utf-16le'))
-    except (ValueError, UnicodeError) as exc:
-        raise RuntimeError('Installed executable lookup returned an invalid path') from exc
+    """Locate a real installed executable using native Windows APIs."""
+    from windows_native import find_installed_executable
+    return find_installed_executable(app, display_name(app))
 
 
 def windows_shortcut(display, executable, desktop=False, shortcut_label=None):
-    """Create a real .lnk whose target is the installed program's executable."""
-    # PowerShell COM is installed with Windows; no third-party libraries necessary.
-    quote = lambda val: "'" + str(val).replace("'", "''") + "'"
-    if desktop:
-        root = "[Environment]::GetFolderPath('DesktopDirectory')"
-    else:
-        root = "[Environment]::GetFolderPath('Programs')"
-    script = (f"$folder={root}; "
-              "if (-not (Test-Path -LiteralPath $folder)) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }; "
-              f"$destination=Join-Path $folder {quote((shortcut_label or display) + '.lnk')}; "
-              f"$exe={quote(executable)}; "
-              "if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw ('Missing installed executable: ' + $exe) }; "
-              "if ([IO.Path]::GetExtension($exe) -ine '.exe') { throw 'Shortcut must target an .exe' }; "
-              "$w=New-Object -ComObject WScript.Shell; "
-              "$s=$w.CreateShortcut($destination); "
-              "$s.TargetPath=$exe; "
-              "$s.WorkingDirectory=Split-Path -Parent $exe; "
-              "$s.IconLocation=($exe + ',0'); $s.Save(); "
-              "$saved=$w.CreateShortcut($destination); "
-              "if ($saved.TargetPath -ine $exe) { Remove-Item -LiteralPath $destination -Force; throw 'Shortcut target verification failed' }")
-    run_windows_powershell(script)
+    """Create and verify a Windows Shell Link without invoking PowerShell."""
+    from windows_native import create_shortcut
+    return create_shortcut(executable, shortcut_label or display, desktop=desktop)
+
 
 def install_windows(app, path, log, desktop=False, shortcut_label=None):
     display = display_name(app)
